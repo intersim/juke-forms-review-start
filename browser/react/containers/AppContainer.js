@@ -11,6 +11,8 @@ import Player from '../components/Player';
 
 import { convertAlbum, convertAlbums, convertSong, skip } from '../utils';
 
+import { hashHistory } from 'react-router';
+
 export default class AppContainer extends Component {
 
   constructor (props) {
@@ -23,6 +25,9 @@ export default class AppContainer extends Component {
     this.prev = this.prev.bind(this);
     this.selectAlbum = this.selectAlbum.bind(this);
     this.selectArtist = this.selectArtist.bind(this);
+    this.addPlaylist = this.addPlaylist.bind(this);
+    this.selectPlaylist = this.selectPlaylist.bind(this);
+    this.getAllSongs = this.getAllSongs.bind(this);
   }
 
   componentDidMount () {
@@ -30,7 +35,8 @@ export default class AppContainer extends Component {
     Promise
       .all([
         axios.get('/api/albums/'),
-        axios.get('/api/artists/')
+        axios.get('/api/artists/'),
+        axios.get('/api/playlists')
       ])
       .then(res => res.map(r => r.data))
       .then(data => this.onLoad(...data));
@@ -41,10 +47,11 @@ export default class AppContainer extends Component {
       this.setProgress(AUDIO.currentTime / AUDIO.duration));
   }
 
-  onLoad (albums, artists) {
+  onLoad (albums, artists, playlists) {
     this.setState({
       albums: convertAlbums(albums),
-      artists: artists
+      artists: artists,
+      playlists: playlists
     });
   }
 
@@ -124,19 +131,55 @@ export default class AppContainer extends Component {
     this.setState({ selectedArtist: artist });
   }
 
+  addPlaylist(name) {
+    return axios.post('/api/playlists', { name })
+    .then(res => res.data)
+    .then(playlist => {
+        this.setState({
+          playlists: [...this.state.playlists, playlist]
+        });
+        hashHistory.push(`/playlists/${playlist.id}`)
+    });
+  }
+
+   selectPlaylist(playlistId) {
+    axios.get(`/api/playlists/${playlistId}`)
+      .then(res => res.data)
+      .then(playlist => {
+        playlist.songs = playlist.songs.map(convertSong);
+        this.setState({
+          selectedPlaylist: playlist
+        });
+      });
+    }
+
+    getAllSongs() {
+      axios.get(`/api/songs`)
+      .then(res => res.data)
+      .then(songs => songs.map(convertSong))
+      .then(convertedSongs => this.setState({ songs: convertedSongs }))
+    }
+
+    updatePlaylist(playlist) {
+      axios.put(`/api/playlists/${playlist.id}`, )
+    }
+
   render () {
 
     const props = Object.assign({}, this.state, {
       toggleOne: this.toggleOne,
       toggle: this.toggle,
       selectAlbum: this.selectAlbum,
-      selectArtist: this.selectArtist
+      selectArtist: this.selectArtist,
+      addPlaylist: this.addPlaylist,
+      selectPlaylist: this.selectPlaylist,
+      getAllSongs: this.getAllSongs
     });
 
     return (
       <div id="main" className="container-fluid">
         <div className="col-xs-2">
-          <Sidebar />
+          <Sidebar playlists={props.playlists} selectPlaylist={this.selectPlaylist} />
         </div>
         <div className="col-xs-10">
         {
